@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 虎牙每日自动助手 - v1 网页端版本 (Huya Web Bot v1)
 功能特性：
@@ -10,17 +9,13 @@
 5. 【完全独立运行】：既可被 main.py 统一调用，也可直接独立运行 `python huya_v1.py`。
 """
 
+import argparse
 import os
+import re
 import sys
 import time
-import re
-import json
-import ssl
-import argparse
-import urllib.request
-from datetime import datetime
-from typing import Dict, Any, Optional
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+
+from playwright.sync_api import sync_playwright
 
 # 确保 Windows 终端标准输出编码正常
 if sys.platform.startswith("win"):
@@ -40,7 +35,8 @@ DEFAULT_CONFIG = {
     "COOKIE_FILE": os.getenv("HUYA_COOKIE_FILE", "huya_cookie.txt").strip(),
     "HEADLESS": os.getenv("HEADLESS", "true").lower() in ("true", "1", "yes"),
     "DO_DAKA": os.getenv("HUYA_DAKA", "true").lower() in ("true", "1", "yes"),
-    "WECHAT_PUSH": os.getenv("HUYA_WECHAT_PUSH", "true").lower() in ("true", "1", "yes"),
+    "WECHAT_PUSH": os.getenv("HUYA_WECHAT_PUSH", "true").lower()
+    in ("true", "1", "yes"),
     "WX_WEBHOOK": os.getenv("WX_WEBHOOK", "").strip(),
 }
 
@@ -54,16 +50,11 @@ DEFAULT_ROOM_DEFAULTS = {
 
 # 引入公共基础库
 from .common import (
-    clean_daka_summary,
-    clean_gift_summary,
-    clean_welfare_summary,
     fetch_room_metadata_http,
     load_cookie_from_files,
-    save_cookie_to_files,
-    make_progress_bar,
     mask_account,
-    parse_cookie,
     push_wecom_message,
+    save_cookie_to_files,
 )
 from .common import log as common_log
 
@@ -75,7 +66,7 @@ def log(level: str, message: str) -> None:
 class HuyaWebBotV1:
     """虎牙 v1 网页端自动化机器人"""
 
-    def __init__(self, config: Optional[dict] = None):
+    def __init__(self, config: dict | None = None):
         self.config = {**DEFAULT_CONFIG, **(config or {})}
         self.room_url = self.config["ROOM_URL"]
         self.account = self.config["ACCOUNT"]
@@ -109,12 +100,12 @@ class HuyaWebBotV1:
                 "--no-sandbox",
                 "--disable-dev-shm-usage",
                 "--disable-blink-features=AutomationControlled",
-                "--disable-infobars"
-            ]
+                "--disable-infobars",
+            ],
         )
         self.context = self.browser.new_context(
             viewport={"width": 1440, "height": 900},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         )
         self.page = self.context.new_page()
 
@@ -123,12 +114,14 @@ class HuyaWebBotV1:
             for item in self.cookie_str.split(";"):
                 if "=" in item:
                     k, v = item.strip().split("=", 1)
-                    cookies_to_add.append({
-                        "name": k.strip(),
-                        "value": v.strip(),
-                        "domain": ".huya.com",
-                        "path": "/"
-                    })
+                    cookies_to_add.append(
+                        {
+                            "name": k.strip(),
+                            "value": v.strip(),
+                            "domain": ".huya.com",
+                            "path": "/",
+                        }
+                    )
             if cookies_to_add:
                 try:
                     self.context.add_cookies(cookies_to_add)
@@ -168,7 +161,9 @@ class HuyaWebBotV1:
         time.sleep(2)
 
         try:
-            iframe_elem = self.page.wait_for_selector("#UDBSdkLgn_iframe", timeout=15000)
+            iframe_elem = self.page.wait_for_selector(
+                "#UDBSdkLgn_iframe", timeout=15000
+            )
             if not iframe_elem:
                 log("ERROR", "未找到登录 iframe 弹窗")
                 return False
@@ -190,7 +185,11 @@ class HuyaWebBotV1:
             if any(kw in body for kw in ["虎牙号", "个人中心", "我的财产", "退出"]):
                 log("SUCCESS", f"账号 [{mask_account(self.account)}] 密码登录成功！")
                 cookies = self.context.cookies()
-                cookie_pairs = [f"{c['name']}={c['value']}" for c in cookies if "huya.com" in c.get("domain", "")]
+                cookie_pairs = [
+                    f"{c['name']}={c['value']}"
+                    for c in cookies
+                    if "huya.com" in c.get("domain", "")
+                ]
                 self.cookie_str = "; ".join(cookie_pairs)
                 save_cookie_to_files(self.cookie_str, cookies)
                 return True
@@ -207,25 +206,31 @@ class HuyaWebBotV1:
             "fans_level": "未知",
             "need_intimacy": "未知",
             "intimacy_progress": "",
-            "badge_name": ""
+            "badge_name": "",
         }
         try:
-            card = self.page.locator(".chat-host-pic, #chatHostPic, [class*='FanClubHd']").first
+            card = self.page.locator(
+                ".chat-host-pic, #chatHostPic, [class*='FanClubHd']"
+            ).first
             if card.is_visible():
                 card.hover()
                 time.sleep(1.5)
-                panel = self.page.locator("[class*='FansCard'], [class*='fans-card'], [class*='panel-fans']").first
+                panel = self.page.locator(
+                    "[class*='FansCard'], [class*='fans-card'], [class*='panel-fans']"
+                ).first
                 if panel.is_visible():
                     txt = panel.inner_text()
-                    m_lvl = re.search(r'(\d+)\s*级', txt)
+                    m_lvl = re.search(r"(\d+)\s*级", txt)
                     if m_lvl:
                         badge_data["fans_level"] = f"{m_lvl.group(1)}级"
-                    m_need = re.search(r'还差\s*(\d+)\s*亲密度', txt)
+                    m_need = re.search(r"还差\s*(\d+)\s*亲密度", txt)
                     if m_need:
                         badge_data["need_intimacy"] = m_need.group(1)
-                    m_prog = re.search(r'(\d+)\s*/\s*(\d+)', txt)
+                    m_prog = re.search(r"(\d+)\s*/\s*(\d+)", txt)
                     if m_prog:
-                        badge_data["intimacy_progress"] = f"{m_prog.group(1)}/{m_prog.group(2)}"
+                        badge_data["intimacy_progress"] = (
+                            f"{m_prog.group(1)}/{m_prog.group(2)}"
+                        )
         except Exception as e:
             log("DEBUG", f"网页提取勋章数据说明: {e}")
         return badge_data
@@ -239,7 +244,7 @@ class HuyaWebBotV1:
             "detail": "未完成",
             "fans_level": "",
             "need_intimacy": "",
-            "intimacy_progress": ""
+            "intimacy_progress": "",
         }
 
         try:
@@ -248,7 +253,9 @@ class HuyaWebBotV1:
 
             badge_elem = None
             for _ in range(10):
-                elem = self.page.locator("#chatHostPic, .chat-host-pic, [class*='FanClubHd']").first
+                elem = self.page.locator(
+                    "#chatHostPic, .chat-host-pic, [class*='FanClubHd']"
+                ).first
                 if elem.is_visible():
                     txt = elem.inner_text().strip()
                     if txt and "成为粉丝" not in txt:
@@ -257,7 +264,9 @@ class HuyaWebBotV1:
                 time.sleep(1)
 
             if not badge_elem or not badge_elem.is_visible():
-                badge_elem = self.page.locator("#chatHostPic, .chat-host-pic, [class*='FanClubHd']").first
+                badge_elem = self.page.locator(
+                    "#chatHostPic, .chat-host-pic, [class*='FanClubHd']"
+                ).first
 
             if not badge_elem or not badge_elem.is_visible():
                 log("WARN", "未找到输入框左侧粉丝勋章入口 (#chatHostPic)")
@@ -275,14 +284,18 @@ class HuyaWebBotV1:
             badge_info = self.query_badge_from_web()
             result.update(badge_info)
 
-            task_item = self.page.locator("[class*='TaskItem']:has-text('每日打卡'), div:has-text('每日打卡领福利')").first
+            task_item = self.page.locator(
+                "[class*='TaskItem']:has-text('每日打卡'), div:has-text('每日打卡领福利')"
+            ).first
             if not task_item.is_visible():
                 try:
                     badge_elem.click()
                 except Exception:
                     pass
                 time.sleep(1.5)
-                task_item = self.page.locator("[class*='TaskItem']:has-text('每日打卡'), div:has-text('每日打卡领福利')").first
+                task_item = self.page.locator(
+                    "[class*='TaskItem']:has-text('每日打卡'), div:has-text('每日打卡领福利')"
+                ).first
 
             if task_item.is_visible():
                 task_text = task_item.inner_text().strip()
@@ -318,20 +331,19 @@ class HuyaWebBotV1:
         gid = self.room_info.get("gid") or "0"
         nick = self.room_info.get("nick") or "目标主播"
 
-        result = {
-            "success": False,
-            "count": 0,
-            "status": "未完成",
-            "detail": ""
-        }
+        result = {"success": False, "count": 0, "status": "未完成", "detail": ""}
 
-        package_url = f"https://hd.huya.com/web/webPackageV2/index.html?lp={lp}&gid={gid}"
+        package_url = (
+            f"https://hd.huya.com/web/webPackageV2/index.html?lp={lp}&gid={gid}"
+        )
         log("INFO", f"正在打开主播 [{nick}] 专属包裹页面: {package_url}")
         self.page.goto(package_url, wait_until="domcontentloaded")
         time.sleep(3)
 
         try:
-            self.page.wait_for_selector(".m-gift-item, :has-text('暂无包裹礼物')", timeout=10000)
+            self.page.wait_for_selector(
+                ".m-gift-item, :has-text('暂无包裹礼物')", timeout=10000
+            )
         except Exception:
             pass
 
@@ -393,17 +405,23 @@ class HuyaWebBotV1:
             present_panel = self.page.locator(".g-present-content")
             present_panel.wait_for(state="visible", timeout=5000)
 
-            input_box = present_panel.locator(".m-present-btn input[type='number'], input[placeholder*='自定义']")
+            input_box = present_panel.locator(
+                ".m-present-btn input[type='number'], input[placeholder*='自定义']"
+            )
             input_box.wait_for(state="visible", timeout=3000)
             input_box.click()
             input_box.fill(str(send_count))
             time.sleep(0.5)
 
-            send_btn = present_panel.locator(".m-present-btn .c-send, :has-text('送出')").first
+            send_btn = present_panel.locator(
+                ".m-present-btn .c-send, :has-text('送出')"
+            ).first
             send_btn.click()
             time.sleep(1)
 
-            confirm_btn = self.page.locator("button:has-text('立即送出'), a:has-text('立即送出'), .btn-success").first
+            confirm_btn = self.page.locator(
+                "button:has-text('立即送出'), a:has-text('立即送出'), .btn-success"
+            ).first
             if confirm_btn.is_visible():
                 confirm_btn.click()
                 time.sleep(2)
@@ -412,7 +430,9 @@ class HuyaWebBotV1:
             result["count"] = send_count
             result["left_count"] = max(0, total_count - send_count)
             result["status"] = "赠送成功"
-            result["detail"] = f"成功送出 {send_count} 个免费虎粮（亲密度+{send_count}）"
+            result["detail"] = (
+                f"成功送出 {send_count} 个免费虎粮（亲密度+{send_count}）"
+            )
             log("SUCCESS", f"🎉 {result['detail']}")
         except Exception as e:
             log("ERROR", f"送虎粮过程异常: {e}")
@@ -437,7 +457,7 @@ class HuyaWebBotV1:
             "badge_name": "",
             "need_intimacy": "",
             "intimacy_progress": "",
-            "all_success": False
+            "all_success": False,
         }
 
         try:
@@ -450,7 +470,9 @@ class HuyaWebBotV1:
                     daka_res = self.web_punch_card()
                     summary["daka_success"] = daka_res.get("success", False)
                     summary["daka_detail"] = daka_res.get("detail", "")
-                    summary["daka_intimacy"] = daka_res.get("intimacy", 5 if summary["daka_success"] else 0)
+                    summary["daka_intimacy"] = daka_res.get(
+                        "intimacy", 5 if summary["daka_success"] else 0
+                    )
                     if daka_res.get("fans_level"):
                         summary["fans_level"] = daka_res["fans_level"]
                     if daka_res.get("badge_name"):
@@ -476,7 +498,9 @@ class HuyaWebBotV1:
                 summary["today_score"] = str(daka_intimacy + gift_intimacy)
                 summary["today_quota"] = "4000"
 
-                summary["all_success"] = summary["daka_success"] and summary["gift_success"]
+                summary["all_success"] = (
+                    summary["daka_success"] and summary["gift_success"]
+                )
         finally:
             self._close_browser()
 
@@ -492,18 +516,24 @@ def run(args=None) -> dict:
     """外部总入口调用的主函数"""
     config = DEFAULT_CONFIG.copy()
     if args:
-        config.update({
-            "GIFT_COUNT": getattr(args, "count", config["GIFT_COUNT"]),
-            "ROOM_URL": getattr(args, "room", None) or config["ROOM_URL"],
-            "DO_DAKA": getattr(args, "do_daka", not getattr(args, "no_daka", False)),
-            "WECHAT_PUSH": getattr(args, "wechat_push", config["WECHAT_PUSH"]),
-            "HEADLESS": not getattr(args, "local_debug", getattr(args, "headful", False)),
-            "ACCOUNT": getattr(args, "account", config["ACCOUNT"]),
-            "PASSWORD": getattr(args, "password", config["PASSWORD"]),
-            "COOKIE": getattr(args, "cookie", config["COOKIE"]),
-            "COOKIE_FILE": getattr(args, "cookie_file", config["COOKIE_FILE"]),
-            "WX_WEBHOOK": getattr(args, "wx_webhook", config["WX_WEBHOOK"]),
-        })
+        config.update(
+            {
+                "GIFT_COUNT": getattr(args, "count", config["GIFT_COUNT"]),
+                "ROOM_URL": getattr(args, "room", None) or config["ROOM_URL"],
+                "DO_DAKA": getattr(
+                    args, "do_daka", not getattr(args, "no_daka", False)
+                ),
+                "WECHAT_PUSH": getattr(args, "wechat_push", config["WECHAT_PUSH"]),
+                "HEADLESS": not getattr(
+                    args, "local_debug", getattr(args, "headful", False)
+                ),
+                "ACCOUNT": getattr(args, "account", config["ACCOUNT"]),
+                "PASSWORD": getattr(args, "password", config["PASSWORD"]),
+                "COOKIE": getattr(args, "cookie", config["COOKIE"]),
+                "COOKIE_FILE": getattr(args, "cookie_file", config["COOKIE_FILE"]),
+                "WX_WEBHOOK": getattr(args, "wx_webhook", config["WX_WEBHOOK"]),
+            }
+        )
 
     bot = HuyaWebBotV1(config)
     return bot.execute()
@@ -511,8 +541,12 @@ def run(args=None) -> dict:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="虎牙每日自动助手 v1 (网页端)")
-    parser.add_argument("-c", "--count", type=int, default=0, help="赠送虎粮数量 (0 为全部送出，默认 0)")
-    parser.add_argument("--headful", action="store_true", help="开启浏览器可视化窗口 (默认无头后台)")
+    parser.add_argument(
+        "-c", "--count", type=int, default=0, help="赠送虎粮数量 (0 为全部送出，默认 0)"
+    )
+    parser.add_argument(
+        "--headful", action="store_true", help="开启浏览器可视化窗口 (默认无头后台)"
+    )
     parser.add_argument("--no-daka", action="store_true", help="跳过每日打卡")
     parser.add_argument("--room", type=str, default=None, help="目标直播间 URL")
     cli_args = parser.parse_args()

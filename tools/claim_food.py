@@ -15,7 +15,6 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from core.mobile_bot import DailyTigerFoodClient, WelfareStatus
 
-
 DEFAULT_PID = 0
 EXIT_OK = 0
 EXIT_CONFIG = 2
@@ -39,7 +38,9 @@ def load_cookie(cookie_file: Path) -> str:
 
 def validate_status(status: WelfareStatus) -> None:
     if status.signal_code != "0":
-        raise RuntimeError(f"查询被协议网关拒绝（状态码 {status.signal_code or '缺失'}）")
+        raise RuntimeError(
+            f"查询被协议网关拒绝（状态码 {status.signal_code or '缺失'}）"
+        )
     if status.business_code != 0:
         raise RuntimeError(f"查询业务返回异常（状态码 {status.business_code}）")
 
@@ -89,7 +90,9 @@ def claim_daily_food(client: DailyTigerFoodClient, pid: int, dry_run: bool) -> i
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="纯 WUP 协议领取粉丝团每日 10 虎粮")
-    parser.add_argument("--pid", type=int, default=int(os.getenv("HUYA_PID", DEFAULT_PID)))
+    parser.add_argument(
+        "--pid", type=int, default=int(os.getenv("HUYA_PID", DEFAULT_PID))
+    )
     parser.add_argument(
         "--cookie-file",
         type=Path,

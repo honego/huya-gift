@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """虎牙看广告领虎粮的人工辅助脚本。
 
 本脚本只查询广告任务状态和虎粮包裹库存。广告必须由用户在虎牙 App
@@ -10,9 +9,8 @@ import argparse
 import os
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
-
 from pathlib import Path
 
 # 确保项目根目录在 sys.path 中
@@ -22,7 +20,6 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from core.mobile_bot import PackageGiftClient, PackageInventory, load_cookie_from_files
 from core.wup import HuyaWupClient, JceInputStream, JceOutputStream
-
 
 DEFAULT_PID = 0
 PACKAGE_TAB_ID = -10000
@@ -227,8 +224,7 @@ def run_guided_rounds(
         print(f"验证成功：本轮实际增加 {gained} 虎粮，当前库存 {after.count}。")
         if status.reward_count > 0 and gained != status.reward_count:
             print(
-                f"注意：任务显示奖励 {status.reward_count}，"
-                f"实际库存变化为 {gained}。"
+                f"注意：任务显示奖励 {status.reward_count}，实际库存变化为 {gained}。"
             )
 
     print(f"\n已完成并验证 {completed} 轮。")
@@ -253,7 +249,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="人工观看虎牙 App 广告，并通过 WUP 库存查询验证虎粮到账"
     )
-    parser.add_argument("--pid", type=positive_int, default=DEFAULT_PID, help="主播 PID")
+    parser.add_argument(
+        "--pid", type=positive_int, default=DEFAULT_PID, help="主播 PID"
+    )
     parser.add_argument(
         "--cookie-file",
         default="huya_cookie.txt",

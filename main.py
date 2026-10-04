@@ -9,7 +9,6 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime
 
-
 TRUE_VALUES = {"1", "true", "yes", "on"}
 FALSE_VALUES = {"0", "false", "no", "off"}
 
@@ -92,30 +91,63 @@ def load_runtime_config() -> dict:
 def build_parser(defaults: dict) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="虎牙每日助手统一调度器")
     parser.add_argument(
-        "-v", "--version", choices=("v1", "v2"), default=defaults["version"],
+        "-v",
+        "--version",
+        choices=("v1", "v2"),
+        default=defaults["version"],
         help="运行版本：v1 网页端，v2 移动端协议版",
     )
     parser.add_argument(
-        "-c", "--count", type=int, default=defaults["count"],
+        "-c",
+        "--count",
+        type=int,
+        default=defaults["count"],
         help="赠送虎粮数量；0 表示送出全部库存",
     )
     parser.add_argument("--room", default=defaults["room"], help="目标直播间地址")
 
     daka = parser.add_mutually_exclusive_group()
-    daka.add_argument("--daka", dest="do_daka", action="store_true", help="执行每日打卡")
-    daka.add_argument("--no-daka", dest="do_daka", action="store_false", help="跳过每日打卡")
+    daka.add_argument(
+        "--daka", dest="do_daka", action="store_true", help="执行每日打卡"
+    )
+    daka.add_argument(
+        "--no-daka", dest="do_daka", action="store_false", help="跳过每日打卡"
+    )
 
     welfare = parser.add_mutually_exclusive_group()
-    welfare.add_argument("--welfare", dest="do_welfare", action="store_true", help="领取每日 10 虎粮（仅 v2）")
-    welfare.add_argument("--no-welfare", dest="do_welfare", action="store_false", help="跳过每日 10 虎粮领取")
+    welfare.add_argument(
+        "--welfare",
+        dest="do_welfare",
+        action="store_true",
+        help="领取每日 10 虎粮（仅 v2）",
+    )
+    welfare.add_argument(
+        "--no-welfare",
+        dest="do_welfare",
+        action="store_false",
+        help="跳过每日 10 虎粮领取",
+    )
 
     push = parser.add_mutually_exclusive_group()
-    push.add_argument("--wechat-push", dest="wechat_push", action="store_true", help="启用企业微信推送")
-    push.add_argument("--no-wechat-push", dest="wechat_push", action="store_false", help="禁用企业微信推送")
+    push.add_argument(
+        "--wechat-push",
+        dest="wechat_push",
+        action="store_true",
+        help="启用企业微信推送",
+    )
+    push.add_argument(
+        "--no-wechat-push",
+        dest="wechat_push",
+        action="store_false",
+        help="禁用企业微信推送",
+    )
 
     debug = parser.add_mutually_exclusive_group()
     debug.add_argument(
-        "--local-debug", "--headful", dest="local_debug", action="store_true",
+        "--local-debug",
+        "--headful",
+        dest="local_debug",
+        action="store_true",
         help="本地调试模式：显示浏览器窗口（仅 v1）",
     )
     debug.add_argument(
@@ -148,7 +180,11 @@ def load_config(argv: list[str] | None = None) -> AppConfig:
     secure_config = {
         key: defaults[key]
         for key in (
-            "account", "password", "cookie", "cookie_file", "wx_webhook",
+            "account",
+            "password",
+            "cookie",
+            "cookie_file",
+            "wx_webhook",
         )
     }
     return AppConfig(
@@ -171,8 +207,10 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     mode = (
-        "本地调试" if config.local_debug else "后台运行"
-    ) if config.version == "v1" else "纯 WUP 协议"
+        ("本地调试" if config.local_debug else "后台运行")
+        if config.version == "v1"
+        else "纯 WUP 协议"
+    )
     print(
         f"[{datetime.now():%Y-%m-%d %H:%M:%S}] [main] "
         f"版本={config.version}，送粮={config.count}，模式={mode}"

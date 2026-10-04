@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 虎牙每日自动助手 - v2 移动 App 端纯协议版本 (Huya Mobile App Bot v2)
 功能特性：
@@ -21,24 +20,15 @@
 
 import argparse
 import hashlib
-import json
 import os
-import re
-import ssl
-import sys
 import time
-import urllib.request
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any, Optional
+from typing import Any
+
 # 引入公共基础库与官方 WUP 协议核心驱动
 from .common import (
-    clean_daka_summary,
-    clean_gift_summary,
-    clean_welfare_summary,
     fetch_room_metadata_http,
     load_cookie_from_files,
-    make_progress_bar,
     mask_account,
     parse_cookie,
     push_wecom_message,
@@ -49,6 +39,8 @@ from .wup import HuyaWupClient, JceOutputStream
 
 def log(level: str, message: str) -> None:
     common_log("v2-App", level, message)
+
+
 DEFAULT_CONFIG = {
     "GIFT_COUNT": int(os.getenv("HUYA_GIFT_COUNT", "0").strip() or 0),
     "ROOM_URL": os.getenv("HUYA_ROOM_URL", "").strip(),
@@ -57,7 +49,8 @@ DEFAULT_CONFIG = {
     "COOKIE_FILE": os.getenv("HUYA_COOKIE_FILE", "huya_cookie.txt").strip(),
     "DO_DAKA": os.getenv("HUYA_DAKA", "true").lower() in ("true", "1", "yes"),
     "DO_WELFARE": os.getenv("HUYA_WELFARE", "true").lower() in ("true", "1", "yes"),
-    "WECHAT_PUSH": os.getenv("HUYA_WECHAT_PUSH", "true").lower() in ("true", "1", "yes"),
+    "WECHAT_PUSH": os.getenv("HUYA_WECHAT_PUSH", "true").lower()
+    in ("true", "1", "yes"),
     "WX_WEBHOOK": os.getenv("WX_WEBHOOK", "").strip(),
 }
 
@@ -114,7 +107,6 @@ class GiftSendResponse:
     message: str
 
 
-
 class DailyTigerFoodClient(HuyaWupClient):
     """使用已验证的新版 App UserId 领取每日 10 虎粮。"""
 
@@ -139,7 +131,9 @@ class DailyTigerFoodClient(HuyaWupClient):
         out.write_long(self.uid, 0)
         out.write_string(os.getenv("HUYA_APP_GUID", "").strip(), 1)
         out.write_string(os.getenv("HUYA_UDB_TOKEN", "").strip(), 2)
-        out.write_string(os.getenv("HUYA_APP_UA", DEFAULT_APP_UA).strip() or DEFAULT_APP_UA, 3)
+        out.write_string(
+            os.getenv("HUYA_APP_UA", DEFAULT_APP_UA).strip() or DEFAULT_APP_UA, 3
+        )
         out.write_string(self.cookie_str, 4)
         out.write_int(token_type, 5)
         out.write_string(
@@ -161,7 +155,7 @@ class DailyTigerFoodClient(HuyaWupClient):
         status = root.get(10, {})
         if not isinstance(status, dict):
             return "", ""
-        return str(status.get("SIGNAL_SERVICE_RET", "")), str(
+        return str(status.get("SIGNAL_SERVICE_RET", "0")), str(
             status.get("STATUS_RESULT_DESC", "")
         )
 
@@ -173,10 +167,14 @@ class DailyTigerFoodClient(HuyaWupClient):
         out.write_int(3, 2)
         out.write_struct_end()
 
-        root, response = self._send_wup("wupui", "queryFansGroupTaskInfo", out.get_bytes())
+        root, response = self._send_wup(
+            "wupui", "queryFansGroupTaskInfo", out.get_bytes()
+        )
         signal_code, _ = self._signal_status(root)
         response_wrapper = response.get("tRsp", {})
-        payload = response_wrapper.get(0, {}) if isinstance(response_wrapper, dict) else {}
+        payload = (
+            response_wrapper.get(0, {}) if isinstance(response_wrapper, dict) else {}
+        )
         day_welfare = payload.get(7, {}) if isinstance(payload, dict) else {}
         return WelfareStatus(
             signal_code=signal_code,
@@ -195,13 +193,17 @@ class DailyTigerFoodClient(HuyaWupClient):
         root, response = self._send_wup("wupui", "operateFansBox", out.get_bytes())
         signal_code, signal_description = self._signal_status(root)
         response_wrapper = response.get("tRsp", {})
-        payload = response_wrapper.get(0, {}) if isinstance(response_wrapper, dict) else {}
+        payload = (
+            response_wrapper.get(0, {}) if isinstance(response_wrapper, dict) else {}
+        )
         business_code = payload.get(0) if isinstance(payload, dict) else None
         item_count = payload.get(5, 0) if isinstance(payload, dict) else 0
         return ClaimResponse(
             signal_code=signal_code,
             signal_description=signal_description,
-            business_code=int(business_code) if isinstance(business_code, int) else None,
+            business_code=int(business_code)
+            if isinstance(business_code, int)
+            else None,
             item_count=int(item_count) if isinstance(item_count, int) else 0,
         )
 
@@ -242,7 +244,11 @@ class PackageGiftClient(HuyaWupClient):
     @staticmethod
     def _signal_code(root: dict[int, Any]) -> str:
         status = root.get(10, {})
-        return str(status.get("SIGNAL_SERVICE_RET", "")) if isinstance(status, dict) else ""
+        return (
+            str(status.get("SIGNAL_SERVICE_RET", "0"))
+            if isinstance(status, dict)
+            else ""
+        )
 
     def query_tiger_food(self, pid: int) -> PackageInventory:
         out = JceOutputStream()
@@ -254,7 +260,9 @@ class PackageGiftClient(HuyaWupClient):
         root, response = self._send_wup("wupui", "getPackageGift", out.get_bytes())
         signal_code = self._signal_code(root)
         response_wrapper = response.get("tRsp", {})
-        payload = response_wrapper.get(0, {}) if isinstance(response_wrapper, dict) else {}
+        payload = (
+            response_wrapper.get(0, {}) if isinstance(response_wrapper, dict) else {}
+        )
         gifts = payload.get(0, []) if isinstance(payload, dict) else []
 
         for gift in gifts if isinstance(gifts, list) else []:
@@ -284,7 +292,7 @@ class PackageGiftClient(HuyaWupClient):
             (
                 f"{self.uid}1{self.FROM_TYPE}{self.BUSINESS_TYPE}"
                 f"{self.SEQUENCE_APP_KEY}"
-            ).encode("utf-8")
+            ).encode()
         ).hexdigest()
 
         out = JceOutputStream()
@@ -299,7 +307,9 @@ class PackageGiftClient(HuyaWupClient):
         root, response = self._send_wup("sequenceui", "getSequence", out.get_bytes())
         signal_code = self._signal_code(root)
         response_wrapper = response.get("tRsp", {})
-        payload = response_wrapper.get(0, {}) if isinstance(response_wrapper, dict) else {}
+        payload = (
+            response_wrapper.get(0, {}) if isinstance(response_wrapper, dict) else {}
+        )
         ret_code = int(payload.get(0, -1)) if isinstance(payload, dict) else -1
         sequence = str(payload.get(1, "")) if isinstance(payload, dict) else ""
         if signal_code != "0" or ret_code != 0 or not sequence:
@@ -374,7 +384,9 @@ class PackageGiftClient(HuyaWupClient):
             "PropsUIServer", "consumeGiftSafe", out.get_bytes()
         )
         response_wrapper = response.get("tRsp", {})
-        payload = response_wrapper.get(0, {}) if isinstance(response_wrapper, dict) else {}
+        payload = (
+            response_wrapper.get(0, {}) if isinstance(response_wrapper, dict) else {}
+        )
         return GiftSendResponse(
             signal_code=self._signal_code(root),
             pay_code=int(payload.get(0, -1)) if isinstance(payload, dict) else -1,
@@ -384,11 +396,10 @@ class PackageGiftClient(HuyaWupClient):
         )
 
 
-
 class HuyaMobileBotV2:
     """虎牙 v2 移动 App 端自动化机器人"""
 
-    def __init__(self, config: Optional[dict] = None):
+    def __init__(self, config: dict | None = None):
         self.config = {**DEFAULT_CONFIG, **(config or {})}
         self.room_url = self.config["ROOM_URL"]
         self.account = self.config["ACCOUNT"]
@@ -400,11 +411,15 @@ class HuyaMobileBotV2:
         self.do_welfare = self.config["DO_WELFARE"]
         self.wechat_push = self.config["WECHAT_PUSH"]
 
-        self.room_info = fetch_room_metadata_http(self.room_url) if self.room_url else DEFAULT_ROOM_DEFAULTS
+        self.room_info = (
+            fetch_room_metadata_http(self.room_url)
+            if self.room_url
+            else DEFAULT_ROOM_DEFAULTS
+        )
         self.pid = int(self.room_info.get("lp") or 0)
-        self.wup_client: Optional[HuyaWupClient] = None
-        self.welfare_client: Optional[DailyTigerFoodClient] = None
-        self.package_client: Optional[PackageGiftClient] = None
+        self.wup_client: HuyaWupClient | None = None
+        self.welfare_client: DailyTigerFoodClient | None = None
+        self.package_client: PackageGiftClient | None = None
 
     def ensure_logged_in(self) -> bool:
         """仅通过 WUP 校验 Cookie，并初始化全部协议客户端。"""
@@ -444,7 +459,7 @@ class HuyaMobileBotV2:
             "badge_name": "",
             "today_score": 0,
             "quota_score": 0,
-            "raw": None
+            "raw": None,
         }
 
         if self.wup_client:
@@ -458,7 +473,10 @@ class HuyaMobileBotV2:
                     badge_data["today_score"] = badge.get("today_score", 0)
                     badge_data["quota_score"] = badge.get("quota_score", 0)
                     badge_data["raw"] = badge
-                    log("INFO", f"【WUP 官方勋章数据】勋章: [{badge.get('badge_name')}] | 等级: {badge_data['fans_level']} | 升级还需: {badge_data['need_intimacy']} 亲密度（进度: {badge_data['intimacy_progress']}）| 今日亲密度: {badge.get('today_score')}/{badge.get('quota_score')}")
+                    log(
+                        "INFO",
+                        f"【WUP 官方勋章数据】勋章: [{badge.get('badge_name')}] | 等级: {badge_data['fans_level']} | 升级还需: {badge_data['need_intimacy']} 亲密度（进度: {badge_data['intimacy_progress']}）| 今日亲密度: {badge.get('today_score')}/{badge.get('quota_score')}",
+                    )
                     return badge_data
             except Exception as e:
                 log("WARN", f"WUP 查询勋章数据异常: {e}")
@@ -470,11 +488,7 @@ class HuyaMobileBotV2:
         nick = self.room_info.get("nick") or "目标主播"
         log("INFO", f"使用 WUP 移动端官方协议执行主播 [{nick}] 粉丝团打卡...")
 
-        result = {
-            "success": False,
-            "status": "未完成",
-            "detail": "未完成"
-        }
+        result = {"success": False, "status": "未完成", "detail": "未完成"}
 
         if not self.wup_client:
             result["detail"] = "WUP 客户端未初始化"
@@ -534,7 +548,7 @@ class HuyaMobileBotV2:
             "success": False,
             "status": "未领取",
             "detail": "未领取",
-            "item_count": 0
+            "item_count": 0,
         }
 
         if not self.welfare_client:
@@ -545,9 +559,14 @@ class HuyaMobileBotV2:
             # 1. 探查任务状态
             before = self.welfare_client.query_welfare(self.pid)
             if before.signal_code != "0" or before.business_code != 0:
-                result["detail"] = f"福利状态查询失败（协议码 {before.signal_code or '缺失'}）"
+                result["detail"] = (
+                    f"福利状态查询失败（协议码 {before.signal_code or '缺失'}）"
+                )
                 return result
-            log("INFO", f"【移动端福利探查】当前状态: {before.description} (状态码: {before.state})")
+            log(
+                "INFO",
+                f"【移动端福利探查】当前状态: {before.description} (状态码: {before.state})",
+            )
 
             if before.state == 4:
                 result["success"] = True
@@ -609,7 +628,7 @@ class HuyaMobileBotV2:
             "count": 0,
             "left_count": None,
             "status": "未完成",
-            "detail": ""
+            "detail": "",
         }
         if not self.package_client:
             result["detail"] = "包裹 WUP 客户端未就绪"
@@ -716,7 +735,7 @@ class HuyaMobileBotV2:
             "intimacy_progress": "",
             "today_score": "",
             "today_quota": "",
-            "all_success": False
+            "all_success": False,
         }
 
         logged_in = self.ensure_logged_in()
@@ -729,7 +748,9 @@ class HuyaMobileBotV2:
                 daka_res = self.mobile_punch_card()
                 summary["daka_success"] = daka_res.get("success", False)
                 summary["daka_detail"] = daka_res.get("detail", "")
-                summary["daka_intimacy"] = daka_res.get("intimacy", 5 if summary["daka_success"] else 0)
+                summary["daka_intimacy"] = daka_res.get(
+                    "intimacy", 5 if summary["daka_success"] else 0
+                )
             else:
                 summary["daka_success"] = True
                 summary["daka_detail"] = "配置跳过打卡"
@@ -766,11 +787,13 @@ class HuyaMobileBotV2:
             summary["today_score"] = str(daka_intimacy + gift_intimacy)
             summary["today_quota"] = str(badge_info.get("quota_score", 4000) or 4000)
 
-            summary["all_success"] = all((
-                summary["daka_success"],
-                summary["welfare_success"],
-                summary["gift_success"],
-            ))
+            summary["all_success"] = all(
+                (
+                    summary["daka_success"],
+                    summary["welfare_success"],
+                    summary["gift_success"],
+                )
+            )
 
         if self.wechat_push:
             push_wecom_message(summary, self.config)
@@ -784,17 +807,23 @@ def run(args=None) -> dict:
     """外部总入口调用的主函数"""
     config = DEFAULT_CONFIG.copy()
     if args:
-        config.update({
-            "GIFT_COUNT": getattr(args, "count", config["GIFT_COUNT"]),
-            "ROOM_URL": getattr(args, "room", None) or config["ROOM_URL"],
-            "DO_DAKA": getattr(args, "do_daka", not getattr(args, "no_daka", False)),
-            "DO_WELFARE": getattr(args, "do_welfare", not getattr(args, "no_welfare", False)),
-            "WECHAT_PUSH": getattr(args, "wechat_push", config["WECHAT_PUSH"]),
-            "ACCOUNT": getattr(args, "account", config["ACCOUNT"]),
-            "COOKIE": getattr(args, "cookie", config["COOKIE"]),
-            "COOKIE_FILE": getattr(args, "cookie_file", config["COOKIE_FILE"]),
-            "WX_WEBHOOK": getattr(args, "wx_webhook", config["WX_WEBHOOK"]),
-        })
+        config.update(
+            {
+                "GIFT_COUNT": getattr(args, "count", config["GIFT_COUNT"]),
+                "ROOM_URL": getattr(args, "room", None) or config["ROOM_URL"],
+                "DO_DAKA": getattr(
+                    args, "do_daka", not getattr(args, "no_daka", False)
+                ),
+                "DO_WELFARE": getattr(
+                    args, "do_welfare", not getattr(args, "no_welfare", False)
+                ),
+                "WECHAT_PUSH": getattr(args, "wechat_push", config["WECHAT_PUSH"]),
+                "ACCOUNT": getattr(args, "account", config["ACCOUNT"]),
+                "COOKIE": getattr(args, "cookie", config["COOKIE"]),
+                "COOKIE_FILE": getattr(args, "cookie_file", config["COOKIE_FILE"]),
+                "WX_WEBHOOK": getattr(args, "wx_webhook", config["WX_WEBHOOK"]),
+            }
+        )
 
     bot = HuyaMobileBotV2(config)
     return bot.execute()
@@ -802,9 +831,13 @@ def run(args=None) -> dict:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="虎牙每日自动助手 v2 (移动 App 端)")
-    parser.add_argument("-c", "--count", type=int, default=0, help="赠送虎粮数量 (0 为全部送出，默认 0)")
+    parser.add_argument(
+        "-c", "--count", type=int, default=0, help="赠送虎粮数量 (0 为全部送出，默认 0)"
+    )
     parser.add_argument("--no-daka", action="store_true", help="跳过每日打卡")
-    parser.add_argument("--no-welfare", action="store_true", help="跳过粉丝团专属福利领取")
+    parser.add_argument(
+        "--no-welfare", action="store_true", help="跳过粉丝团专属福利领取"
+    )
     parser.add_argument("--room", type=str, default=None, help="目标直播间 URL")
     cli_args = parser.parse_args()
 

@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 虎牙 Cookie 快速获取助手
 本地运行此脚本将弹出浏览器，登录后自动提取并保存完整的 Cookie。
 获取的 Cookie 可直接配置到 GitHub Secrets 中用于每日自动运行。
 """
 
+import json
 import os
 import sys
 import time
-import json
+
 from playwright.sync_api import sync_playwright
 
 DEFAULT_ACCOUNT = os.getenv("HUYA_ACCOUNT", "").strip()
@@ -28,14 +28,11 @@ def get_cookie():
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=False,
-            args=[
-                "--disable-blink-features=AutomationControlled",
-                "--no-sandbox"
-            ]
+            args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
         )
         context = browser.new_context(
             viewport={"width": 1280, "height": 800},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         )
         page = context.new_page()
 
@@ -55,7 +52,9 @@ def get_cookie():
                         frame.locator("#username").fill(DEFAULT_ACCOUNT)
                     if DEFAULT_PASSWORD:
                         frame.locator("#password").fill(DEFAULT_PASSWORD)
-                    print(f"[提示] 已预填账号 [{DEFAULT_ACCOUNT}]，请在弹出窗口中点击登录（如有滑块请拖动）。")
+                    print(
+                        f"[提示] 已预填账号 [{DEFAULT_ACCOUNT}]，请在弹出窗口中点击登录（如有滑块请拖动）。"
+                    )
         except Exception:
             pass
 
@@ -70,11 +69,17 @@ def get_cookie():
             cookie_names = [c["name"] for c in huya_cookies]
 
             # 检测关键登录态 Cookie
-            if any(k in cookie_names for k in ["yyuid", "udb_uid", "udb_biztoken", "udb_passdata"]):
+            if any(
+                k in cookie_names
+                for k in ["yyuid", "udb_uid", "udb_biztoken", "udb_passdata"]
+            ):
                 # 再次确认页面已进入个人中心或头部已登录
                 try:
                     body_text = page.inner_text("body")
-                    if any(kw in body_text for kw in ["虎牙号", "个人中心", "我的财产", "退出"]):
+                    if any(
+                        kw in body_text
+                        for kw in ["虎牙号", "个人中心", "我的财产", "退出"]
+                    ):
                         logged_in = True
                         break
                 except Exception:

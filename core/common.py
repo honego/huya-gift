@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 虎牙每日助手公共基础库 (Huya Helper Common Module)
 提供日志输出、敏感信息脱敏、进度条渲染、Cookie 管理、直播间元数据解析与多渠道消息推送。
@@ -7,7 +6,7 @@
 
 from __future__ import annotations
 
-import hashlib
+import gzip
 import json
 import os
 import re
@@ -15,7 +14,7 @@ import ssl
 import sys
 import urllib.request
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 # 确保 Windows 终端标准输出编码正常
 if sys.platform.startswith("win"):
@@ -57,7 +56,7 @@ def mask_account(account: str) -> str:
     return "***"
 
 
-def make_progress_bar(current: int, total: int, length: int = 8) -> Tuple[str, str]:
+def make_progress_bar(current: int, total: int, length: int = 8) -> tuple[str, str]:
     """生成简约黑白方块进度条 [■■■■■□□□] 及百分比字符串 (专为手机端零折行设计)."""
     if total <= 0:
         return "□" * length, "0.0%"
@@ -114,9 +113,9 @@ def clean_gift_summary(detail: str, success: bool, count: int = 0) -> str:
     return detail[:8] if detail else "未赠送"
 
 
-def parse_cookie(cookie_text: str) -> Dict[str, str]:
+def parse_cookie(cookie_text: str) -> dict[str, str]:
     """解析 Cookie 字符串为键值字典."""
-    cookies: Dict[str, str] = {}
+    cookies: dict[str, str] = {}
     for part in cookie_text.split(";"):
         name, separator, value = part.strip().partition("=")
         if separator and name:
@@ -139,17 +138,21 @@ def load_cookie_from_files(cookie_file: str = "huya_cookie.txt") -> str:
         try:
             with open("huya_cookies.json", "r", encoding="utf-8") as f:
                 cookies_list = json.load(f)
-                return "; ".join([
-                    f"{c['name']}={c['value']}"
-                    for c in cookies_list
-                    if "huya.com" in c.get("domain", "")
-                ])
+                return "; ".join(
+                    [
+                        f"{c['name']}={c['value']}"
+                        for c in cookies_list
+                        if "huya.com" in c.get("domain", "")
+                    ]
+                )
         except Exception:
             pass
     return ""
 
 
-def save_cookie_to_files(cookie_text: str, cookie_file: str = "huya_cookie.txt") -> None:
+def save_cookie_to_files(
+    cookie_text: str, cookie_file: str = "huya_cookie.txt"
+) -> None:
     """将 Cookie 文本安全保存至本地文件."""
     if not cookie_text:
         return
@@ -160,7 +163,7 @@ def save_cookie_to_files(cookie_text: str, cookie_file: str = "huya_cookie.txt")
         log("Common", "WARN", f"保存 Cookie 至本地失败: {e}")
 
 
-def fetch_room_metadata_http(room_url: str) -> Dict[str, Any]:
+def fetch_room_metadata_http(room_url: str) -> dict[str, Any]:
     """通过 HTTP 请求轻量抓取主播基础元数据 (lp, gid, profileRoom, nick)."""
     info = {
         "lp": DEFAULT_ROOM_METADATA["lp"],
@@ -175,7 +178,10 @@ def fetch_room_metadata_http(room_url: str) -> Dict[str, Any]:
         }
         req = urllib.request.Request(room_url, headers=headers)
         with urllib.request.urlopen(req, timeout=8) as resp:
-            content = resp.read().decode("utf-8", errors="ignore")
+            content = resp.read()
+            if resp.headers.get("Content-Encoding") == "gzip":
+                content = gzip.decompress(content)
+            content = content.decode("utf-8", errors="ignore")
 
         m_lp = re.search(r'"lp"\s*:\s*"?(\d+)"?', content)
         m_gid = re.search(r'"gid"\s*:\s*"?(\d+)"?', content)
@@ -196,7 +202,7 @@ def fetch_room_metadata_http(room_url: str) -> Dict[str, Any]:
     return info
 
 
-def build_report_text(summary: Dict[str, Any]) -> str:
+def build_report_text(summary: dict[str, Any]) -> str:
     """构造优雅紧凑的黑白方块文本报告 (专为手机端零折行排版优化)."""
     nick = summary.get("nick") or "目标主播"
     clean_nick = re.sub(r"-\d+$", "", nick)
@@ -258,15 +264,36 @@ def build_report_text(summary: Dict[str, Any]) -> str:
     details = []
     daka_raw = summary.get("daka_detail", "未执行")
     daka_intimacy = summary.get("daka_intimacy", 0)
-    details.append(("签到", clean_daka_summary(daka_raw, summary.get("daka_success", False), daka_intimacy)))
+    details.append(
+        (
+            "签到",
+            clean_daka_summary(
+                daka_raw, summary.get("daka_success", False), daka_intimacy
+            ),
+        )
+    )
 
     welfare_raw = summary.get("welfare_detail")
     if welfare_raw and welfare_raw != "跳过福利":
-        details.append(("福利", clean_welfare_summary(welfare_raw, summary.get("welfare_success", False))))
+        details.append(
+            (
+                "福利",
+                clean_welfare_summary(
+                    welfare_raw, summary.get("welfare_success", False)
+                ),
+            )
+        )
 
     gift_raw = summary.get("gift_detail", "未执行")
     gift_count = summary.get("gift_count", 0)
-    details.append(("送礼", clean_gift_summary(gift_raw, summary.get("gift_success", False), gift_count)))
+    details.append(
+        (
+            "送礼",
+            clean_gift_summary(
+                gift_raw, summary.get("gift_success", False), gift_count
+            ),
+        )
+    )
 
     left_count = summary.get("left_count")
     if left_count is not None:
@@ -294,7 +321,7 @@ def write_github_summary(title: str, text_content: str) -> None:
             pass
 
 
-def push_wecom_message(summary: Dict[str, Any], config: Dict[str, Any]) -> None:
+def push_wecom_message(summary: dict[str, Any], config: dict[str, Any]) -> None:
     """统一向企业微信群机器人 Webhook 及 Actions Summary 推送执行报告."""
     text_content = build_report_text(summary)
 

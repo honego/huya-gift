@@ -1,11 +1,11 @@
 import unittest
+
 from core.common import (
+    build_report_text,
     clean_daka_summary,
     clean_gift_summary,
-    clean_welfare_summary,
-    build_report_text,
-    make_progress_bar
 )
+
 
 class TestReportLogic(unittest.TestCase):
     def test_clean_gift_summary_sent_tiger_food(self):
@@ -28,8 +28,18 @@ class TestReportLogic(unittest.TestCase):
 
     def test_clean_daka_summary(self):
         # 今日已打卡或新打卡成功
-        self.assertEqual(clean_daka_summary("今日已经完成粉丝团打卡，无需重复领取", success=True, intimacy=5), "打卡成功 (+5)")
-        self.assertEqual(clean_daka_summary("打卡成功（亲密度+5，状态复查已确认）", success=True, intimacy=5), "打卡成功 (+5)")
+        self.assertEqual(
+            clean_daka_summary(
+                "今日已经完成粉丝团打卡，无需重复领取", success=True, intimacy=5
+            ),
+            "打卡成功 (+5)",
+        )
+        self.assertEqual(
+            clean_daka_summary(
+                "打卡成功（亲密度+5，状态复查已确认）", success=True, intimacy=5
+            ),
+            "打卡成功 (+5)",
+        )
 
     def test_build_report_text_full_flow(self):
         # 模拟打卡+领福利+送出10虎粮的完整流程
@@ -107,25 +117,48 @@ class TestReportLogic(unittest.TestCase):
 
     def test_mobile_bot_execute_calculation(self):
         from unittest.mock import MagicMock
+
         from core.mobile_bot import HuyaMobileBotV2
 
-        bot = HuyaMobileBotV2({"COOKIE": "yyuid=123; udb_uid=123", "ACCOUNT": "18579071857"})
+        bot = HuyaMobileBotV2(
+            {"COOKIE": "yyuid=123; udb_uid=123", "ACCOUNT": "18579071857"}
+        )
         bot.ensure_logged_in = MagicMock(return_value=True)
-        bot.mobile_punch_card = MagicMock(return_value={
-            "success": True, "status": "打卡成功", "detail": "打卡成功（亲密度+5）", "intimacy": 5
-        })
-        bot.claim_mobile_welfare = MagicMock(return_value={
-            "success": True, "status": "领取成功", "detail": "成功领取移动端专属福利", "item_count": 10
-        })
-        bot.send_tiger_food = MagicMock(return_value={
-            "success": True, "status": "赠送成功", "detail": "成功送出 10 个虎粮（库存 10 → 0）",
-            "count": 10, "left_count": 0
-        })
-        bot.query_badge_wup = MagicMock(return_value={
-            "fans_level": "Lv.22", "badge_name": "楚河", "need_intimacy": "7183",
-            "intimacy_progress": "167817/175000", "quota_score": 4000,
-            "raw": {"current_score": 167817, "next_score": 175000}
-        })
+        bot.mobile_punch_card = MagicMock(
+            return_value={
+                "success": True,
+                "status": "打卡成功",
+                "detail": "打卡成功（亲密度+5）",
+                "intimacy": 5,
+            }
+        )
+        bot.claim_mobile_welfare = MagicMock(
+            return_value={
+                "success": True,
+                "status": "领取成功",
+                "detail": "成功领取移动端专属福利",
+                "item_count": 10,
+            }
+        )
+        bot.send_tiger_food = MagicMock(
+            return_value={
+                "success": True,
+                "status": "赠送成功",
+                "detail": "成功送出 10 个虎粮（库存 10 → 0）",
+                "count": 10,
+                "left_count": 0,
+            }
+        )
+        bot.query_badge_wup = MagicMock(
+            return_value={
+                "fans_level": "Lv.22",
+                "badge_name": "楚河",
+                "need_intimacy": "7183",
+                "intimacy_progress": "167817/175000",
+                "quota_score": 4000,
+                "raw": {"current_score": 167817, "next_score": 175000},
+            }
+        )
         bot.wechat_push = False
 
         summary = bot.execute()
@@ -139,18 +172,31 @@ class TestReportLogic(unittest.TestCase):
 
     def test_web_bot_execute_calculation(self):
         from unittest.mock import MagicMock
+
         from core.web_bot import HuyaWebBotV1
 
         bot = HuyaWebBotV1({"COOKIE": "yyuid=123", "ACCOUNT": "18579071857"})
         bot.ensure_logged_in = MagicMock(return_value=True)
-        bot.web_punch_card = MagicMock(return_value={
-            "success": True, "status": "打卡成功", "detail": "网页端打卡成功（亲密度+5）", "intimacy": 5,
-            "fans_level": "22级", "badge_name": "楚河", "need_intimacy": "7183"
-        })
-        bot.web_send_tiger_food = MagicMock(return_value={
-            "success": True, "status": "赠送成功", "detail": "成功送出 5 个免费虎粮",
-            "count": 5, "left_count": 15
-        })
+        bot.web_punch_card = MagicMock(
+            return_value={
+                "success": True,
+                "status": "打卡成功",
+                "detail": "网页端打卡成功（亲密度+5）",
+                "intimacy": 5,
+                "fans_level": "22级",
+                "badge_name": "楚河",
+                "need_intimacy": "7183",
+            }
+        )
+        bot.web_send_tiger_food = MagicMock(
+            return_value={
+                "success": True,
+                "status": "赠送成功",
+                "detail": "成功送出 5 个免费虎粮",
+                "count": 5,
+                "left_count": 15,
+            }
+        )
         bot._close_browser = MagicMock()
         bot.wechat_push = False
 
@@ -162,6 +208,7 @@ class TestReportLogic(unittest.TestCase):
         self.assertIn("🔥 今日：10 / 4000", report)
         self.assertIn("├ 送礼：已送 5 个", report)
         self.assertIn("└ 余量：15 个", report)
+
 
 if __name__ == "__main__":
     unittest.main()

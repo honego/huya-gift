@@ -18,6 +18,7 @@
 本项目是专为**虎牙直播（Huya.com）**打造的自动化助手工具，实现每日自动完成粉丝团打卡（亲密度 +5）、移动端专属福利领取（每日 10 虎粮）、包裹免费虎粮库存查询及定向赠送给指定主播，并生成极其精致的移动端零折行黑白方块进度报告。
 
 项目提供两种运行模式：
+
 - ⚡ **v2（推荐 · 移动端纯协议版）**：采用纯 Python 原生实现的 JCE/WUP 协议直连官方网关（`wup.huya.com`），毫秒级完成状态校验、打卡与领粮送礼。**无需启动无头浏览器，零内存消耗，节省 90% 以上 Actions 运行时间**。
 - 🌐 **v1（网页端兜底版）**：基于 Playwright 自动化驱动无头 Chromium 模拟真实用户行为，支持可视化的本地交互与登录。
 
@@ -88,6 +89,7 @@
 ## 🚀 快速使用指南 (GitHub Actions 运行)
 
 ### 第一步：Fork 本仓库
+
 点击仓库右上角 **Fork** 按钮，将本仓库复制到您个人的 GitHub 账号下。
 
 > **开启工作流权限**（关键）：
@@ -98,7 +100,9 @@
 ### 第二步：获取虎牙登录凭据 (Cookie)
 
 #### 方法 A：使用内置脚本一键获取（最便捷）
+
 在本地电脑执行以下命令，将自动弹出登录窗口，手机虎牙 App 扫码即可自动提取并生成配置好的 Cookie：
+
 ```bash
 pip install -r requirements.txt
 playwright install chromium
@@ -106,10 +110,11 @@ python tools/get_cookie.py
 ```
 
 #### 方法 B：浏览器手动抓取
+
 1. 在电脑浏览器登录 [虎牙直播个人中心](https://i.huya.com/)。
 2. 按 `F12` 打开开发者工具，切换至 **Network (网络)** 标签页并刷新页面。
 3. 复制任意请求中的 **Request Headers -> Cookie**。
-   *(必须包含 `yyuid` 或 `udb_uid` 以及登录认证令牌)*
+   _(必须包含 `yyuid` 或 `udb_uid` 以及登录认证令牌)_
 
 ---
 
@@ -118,34 +123,37 @@ python tools/get_cookie.py
 进入仓库的 **Settings** -> **Secrets and variables** -> **Actions**：
 
 #### 1. 必要 Secrets 配置 (Repository secrets)
+
 点击 **New repository secret** 添加：
 
-| Secret 变量名 | 必填 | 说明 | 示例 |
-| :--- | :---: | :--- | :--- |
-| `HUYA_COOKIE` | **是** | 虎牙完整登录 Cookie | `yyuid=...; udb_biztoken=...;` |
-| `HUYA_ROOM_URL` | **是** | **目标主播直播间地址**（打卡粉丝团与赠送虎粮的目标） | `https://www.huya.com/123456` *(填入您关注的主播房间)* |
-| `WX_WEBHOOK` | 否 | 企业微信群机器人 Webhook 地址（全文本卡片推送） | 群机器人的完整 Webhook URL |
-| `TELEGRAM_BOT_TOKEN` | 否 | Telegram Bot Token（与 Chat ID 同时配置后启用） | 从 BotFather 创建 Bot 后获得 |
-| `TELEGRAM_CHAT_ID` | 否 | Telegram 接收消息的 Chat ID | 请自行获取目标用户、群组或频道的 Chat ID |
-| `TELEGRAM_MESSAGE_THREAD_ID` | 否 | Telegram Forum Topic / 群组话题 ID | 仅向指定话题推送时配置 |
+| Secret 变量名                |  必填  | 说明                                                 | 示例                                                   |
+| :--------------------------- | :----: | :--------------------------------------------------- | :----------------------------------------------------- |
+| `HUYA_COOKIE`                | **是** | 虎牙完整登录 Cookie                                  | `yyuid=...; udb_biztoken=...;`                         |
+| `HUYA_ROOM_URL`              | **是** | **目标主播直播间地址**（打卡粉丝团与赠送虎粮的目标） | `https://www.huya.com/123456` _(填入您关注的主播房间)_ |
+| `WX_WEBHOOK`                 | **否** | 企业微信群机器人 Webhook 地址（全文本卡片推送）      | 群机器人的完整 Webhook URL                             |
+| `TELEGRAM_BOT_TOKEN`         | **否** | Telegram Bot Token（与 Chat ID 同时配置后启用）      | 从 BotFather 创建 Bot 后获得                           |
+| `TELEGRAM_CHAT_ID`           | **否** | Telegram 接收消息的 Chat ID                          | 请自行获取目标用户、群组或频道的 Chat ID               |
+| `TELEGRAM_MESSAGE_THREAD_ID` | **否** | Telegram Forum Topic / 群组话题 ID                   | 仅向指定话题推送时配置                                 |
 
 Telegram 推送为可选功能。请在 GitHub Actions Secrets 或本地运行环境中同时配置 `TELEGRAM_BOT_TOKEN` 和 `TELEGRAM_CHAT_ID`；如需推送到群组话题，再配置 `TELEGRAM_MESSAGE_THREAD_ID`。未完整配置时会自动跳过。
 
 > 📌 **目标主播配置说明**：
+>
 > - 可以在 **Repository secrets** 中添加 `HUYA_ROOM_URL`（私密配置）；
 > - 或者在 **Repository variables** 中添加 `HUYA_ROOM_URL`（随时方便查看修改）；
 > - 格式为标准的虎牙直播间链接，例如 `https://www.huya.com/123456` 或带有房号别名的链接。脚本将自动通过官方 API 动态获取该主播的 PID 与元数据，绝不泄露任何主播私隐！
 
 #### 2. 自定义运行选项 (Repository variables，可选)
+
 在 **Variables** 标签页中按需配置覆盖：
 
-| Variable 变量名 | 默认值 | 说明 |
-| :--- | :---: | :--- |
-| `HUYA_GIFT_COUNT` | `0` | 每次赠送虎粮数量（`0` 表示全部赠送，或指定数字如 `10`） |
-| `HUYA_VERSION` | `v2` | 运行版本（`v2` 移动端纯协议版推荐，`v1` 网页端） |
-| `HUYA_DAKA` | `true` | 是否执行每日粉丝团打卡（亲密度 +5） |
-| `HUYA_WELFARE` | `true` | 是否领取移动端每日专属 10 虎粮 |
-| `HUYA_WECHAT_PUSH` | `true` | 是否通过企业微信群机器人推送卡片报告 |
+| Variable 变量名    | 默认值 | 说明                                                    |
+| :----------------- | :----: | :------------------------------------------------------ |
+| `HUYA_GIFT_COUNT`  |  `0`   | 每次赠送虎粮数量（`0` 表示全部赠送，或指定数字如 `10`） |
+| `HUYA_VERSION`     |  `v2`  | 运行版本（`v2` 移动端纯协议版推荐，`v1` 网页端）        |
+| `HUYA_DAKA`        | `true` | 是否执行每日粉丝团打卡（亲密度 +5）                     |
+| `HUYA_WELFARE`     | `true` | 是否领取移动端每日专属 10 虎粮                          |
+| `HUYA_WECHAT_PUSH` | `true` | 是否通过企业微信群机器人推送卡片报告                    |
 
 ---
 

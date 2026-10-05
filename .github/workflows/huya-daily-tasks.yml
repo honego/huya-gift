@@ -1,36 +1,36 @@
-name: 虎牙每日助手
+---
+name: Huya daily tasks
 
 on:
   schedule:
-    # 每天定时执行：cron "10 23 * * *"（Actions 为 UTC 23:10，对应北京时间 07:10）
-    - cron: "10 23 * * *"
+    - cron: 10 23 * * *
   workflow_dispatch:
     inputs:
       version:
-        description: 运行版本
+        description: Running version
         type: choice
         options: [v2, v1]
         default: v2
       room_url:
-        description: 目标主播直播间地址（如 https://www.huya.com/123456）
+        description: "Target Livestream URL (like: https://www.huya.com/123456)"
         type: string
         default: ""
       gift_count:
-        description: 送虎粮个数（0 为全部）
+        description: Number of gifts (0 means all)
         type: string
         default: "0"
       daka:
-        description: 执行每日打卡
+        description: Daily check-in
         type: choice
         options: ["true", "false"]
         default: "true"
       welfare:
-        description: 领取每日 10 虎粮（仅 v2）
+        description: Claim 10 Huya Food daily (v2 only)
         type: choice
         options: ["true", "false"]
         default: "true"
       wechat_push:
-        description: 推送企业微信报告
+        description: Send report via WeCom
         type: choice
         options: ["true", "false"]
         default: "true"
@@ -39,34 +39,35 @@ permissions:
   contents: read
 
 jobs:
-  daily:
+  tasks:
+    name: Huya daily tasks
     runs-on: ubuntu-latest
     timeout-minutes: 20
+
     steps:
-      - name: 检出代码
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: 设置 Python
+      - name: Setup python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
 
-      - name: 安装依赖
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: 安装 V1 浏览器
+      - name: Install browser
         if: ${{ (github.event_name == 'workflow_dispatch' && inputs.version == 'v1') || (github.event_name != 'workflow_dispatch' && vars.HUYA_VERSION == 'v1') }}
         run: |
           playwright install --with-deps chromium
 
-      - name: 检查 Python 语法
-        run: |
-          python -m compileall -q .
+      - name: Check python syntax
+        run: python -m compileall -q .
 
-      - name: 执行每日任务
+      - name: Huya daily tasks
         env:
           HUYA_VERSION: ${{ inputs.version || vars.HUYA_VERSION || 'v2' }}
           HUYA_ROOM_URL: ${{ inputs.room_url || vars.HUYA_ROOM_URL || secrets.HUYA_ROOM_URL || '' }}
@@ -82,12 +83,13 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_MESSAGE_THREAD_ID: ${{ secrets.TELEGRAM_MESSAGE_THREAD_ID }}
-        run: python main.py
+        run: python3 main.py
 
-      - name: 上传异常截图
+      - name: Upload screenshot the error
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: debug-screenshots
+          name: screenshots
           path: screenshots/
           if-no-files-found: ignore
+          retention-days: 1

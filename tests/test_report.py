@@ -116,7 +116,7 @@ class TestReportLogic(unittest.TestCase):
         self.assertIn("└ 余量：0 个", report)
 
     def test_mobile_bot_execute_calculation(self):
-        from unittest.mock import MagicMock
+        from unittest.mock import MagicMock, patch
 
         from core.mobile_bot import HuyaMobileBotV2
 
@@ -161,7 +161,10 @@ class TestReportLogic(unittest.TestCase):
         )
         bot.wechat_push = False
 
-        summary = bot.execute()
+        with patch("core.mobile_bot.push_wecom_message") as mock_push:
+            summary = bot.execute()
+        mock_push.assert_called_once_with(summary, bot.config)
+        self.assertFalse(bot.config["WECHAT_PUSH"])
         self.assertEqual(summary["gift_count"], 10)
         self.assertEqual(summary["today_score"], "15")  # 5 打卡 + 10 送粮 = 15
 
@@ -171,7 +174,7 @@ class TestReportLogic(unittest.TestCase):
         self.assertIn("└ 余量：0 个", report)
 
     def test_web_bot_execute_calculation(self):
-        from unittest.mock import MagicMock
+        from unittest.mock import MagicMock, patch
 
         from core.web_bot import HuyaWebBotV1
 
@@ -200,7 +203,10 @@ class TestReportLogic(unittest.TestCase):
         bot._close_browser = MagicMock()
         bot.wechat_push = False
 
-        summary = bot.execute()
+        with patch("core.web_bot.push_wecom_message") as mock_push:
+            summary = bot.execute()
+        mock_push.assert_called_once_with(summary, bot.config)
+        self.assertFalse(bot.config["WECHAT_PUSH"])
         self.assertEqual(summary["gift_count"], 5)
         self.assertEqual(summary["today_score"], "10")  # 5 打卡 + 5 送粮 = 10
 

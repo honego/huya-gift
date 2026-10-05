@@ -79,6 +79,9 @@ jobs:
           HUYA_ACCOUNT: ${{ secrets.HUYA_ACCOUNT }}
           HUYA_PASSWORD: ${{ secrets.HUYA_PASSWORD }}
           WX_WEBHOOK: ${{ secrets.WX_WEBHOOK }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_MESSAGE_THREAD_ID: ${{ secrets.TELEGRAM_MESSAGE_THREAD_ID }}
         run: python main.py
 
       - name: 上传异常截图

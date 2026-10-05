@@ -12,6 +12,7 @@ import os
 import re
 import ssl
 import sys
+import urllib.error
 import urllib.request
 from datetime import datetime
 from typing import Any
@@ -321,18 +322,87 @@ def write_github_summary(title: str, text_content: str) -> None:
             pass
 
 
+def push_telegram_message(text_content: str) -> bool:
+    """通过 Telegram Bot API 推送纯文本报告，失败时仅记录日志。"""
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    if not bot_token or not chat_id:
+        return False
+
+    payload: dict[str, Any] = {
+        "chat_id": chat_id,
+        "text": text_content,
+    }
+    thread_id = os.getenv("TELEGRAM_MESSAGE_THREAD_ID", "").strip()
+    if thread_id:
+        try:
+            payload["message_thread_id"] = int(thread_id)
+        except ValueError:
+            log(
+                "Common",
+                "WARN",
+                "TELEGRAM_MESSAGE_THREAD_ID 必须是整数，已忽略并发送普通 Telegram 消息。",
+            )
+
+    try:
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        request = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(
+            request,
+            timeout=10,
+            context=ssl.create_default_context(),
+        ) as response:
+            status = getattr(response, "status", None)
+            if status is None:
+                status = response.getcode()
+            if status is not None and not 200 <= int(status) < 300:
+                log("Common", "ERROR", f"Telegram push failed: HTTP {status}.")
+                return False
+            response_data = json.loads(response.read().decode("utf-8"))
+
+        if not isinstance(response_data, dict) or response_data.get("ok") is not True:
+            error_code = "unknown"
+            if isinstance(response_data, dict) and isinstance(
+                response_data.get("error_code"), int
+            ):
+                error_code = response_data["error_code"]
+            log(
+                "Common",
+                "ERROR",
+                f"Telegram push failed: API ok=false (error_code={error_code}).",
+            )
+            return False
+
+        log("Common", "SUCCESS", "Telegram Bot 纯文本消息推送成功！")
+        return True
+    except urllib.error.HTTPError as exc:
+        log("Common", "ERROR", f"Telegram push failed: HTTP {exc.code}.")
+    except json.JSONDecodeError:
+        log("Common", "ERROR", "Telegram push failed: 响应不是有效 JSON。")
+    except Exception as exc:
+        log(
+            "Common",
+            "ERROR",
+            f"Telegram push failed: 网络请求异常 ({type(exc).__name__})。",
+        )
+    return False
+
+
 def push_wecom_message(summary: dict[str, Any], config: dict[str, Any]) -> None:
-    """统一向企业微信群机器人 Webhook 及 Actions Summary 推送执行报告."""
+    """统一向 Actions Summary、企业微信及 Telegram 推送执行报告."""
     text_content = build_report_text(summary)
 
     # 1. 写入 GitHub Actions 页面报告
     write_github_summary("虎牙每日助手 · 执行报告", text_content)
 
-    ctx = ssl.create_default_context()
-
     # 2. 企业微信 Webhook 机器人推送
     webhook_url = config.get("WX_WEBHOOK")
-    if webhook_url:
+    if config.get("WECHAT_PUSH", True) and webhook_url:
         try:
             log("Common", "INFO", "正在通过企业微信群机器人 Webhook 推送全文本报告...")
             payload = {
@@ -344,7 +414,9 @@ def push_wecom_message(summary: dict[str, Any], config: dict[str, Any]) -> None:
                 data=json.dumps(payload).encode("utf-8"),
                 headers={"Content-Type": "application/json"},
             )
-            with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
+            with urllib.request.urlopen(
+                req, timeout=10, context=ssl.create_default_context()
+            ) as resp:
                 res_data = json.loads(resp.read().decode("utf-8"))
                 if res_data.get("errcode") == 0:
                     log("Common", "SUCCESS", "企业微信 Webhook 纯文本消息推送成功！")
@@ -352,3 +424,6 @@ def push_wecom_message(summary: dict[str, Any], config: dict[str, Any]) -> None:
                     log("Common", "WARN", f"企业微信 Webhook 推送返回: {res_data}")
         except Exception as e:
             log("Common", "ERROR", f"企业微信 Webhook 推送失败: {e}")
+
+    # 3. Telegram Bot 推送（仅由 Telegram 环境变量决定是否启用）
+    push_telegram_message(text_content)

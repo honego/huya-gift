@@ -795,10 +795,10 @@ class HuyaMobileBotV2:
                 )
             )
 
-        if self.wechat_push:
-            push_wecom_message(summary, self.config)
-        else:
+        if not self.wechat_push:
             log("INFO", "企业微信推送已禁用。")
+        self.config["WECHAT_PUSH"] = self.wechat_push
+        push_wecom_message(summary, self.config)
         log("INFO", "========== 虎牙助手 v2 移动 App 端运行结束 ==========")
         return summary
 

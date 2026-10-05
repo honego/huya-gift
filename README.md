@@ -125,6 +125,11 @@ python tools/get_cookie.py
 | `HUYA_COOKIE` | **是** | 虎牙完整登录 Cookie | `yyuid=...; udb_biztoken=...;` |
 | `HUYA_ROOM_URL` | **是** | **目标主播直播间地址**（打卡粉丝团与赠送虎粮的目标） | `https://www.huya.com/123456` *(填入您关注的主播房间)* |
 | `WX_WEBHOOK` | 否 | 企业微信群机器人 Webhook 地址（全文本卡片推送） | 群机器人的完整 Webhook URL |
+| `TELEGRAM_BOT_TOKEN` | 否 | Telegram Bot Token（与 Chat ID 同时配置后启用） | 从 BotFather 创建 Bot 后获得 |
+| `TELEGRAM_CHAT_ID` | 否 | Telegram 接收消息的 Chat ID | 请自行获取目标用户、群组或频道的 Chat ID |
+| `TELEGRAM_MESSAGE_THREAD_ID` | 否 | Telegram Forum Topic / 群组话题 ID | 仅向指定话题推送时配置 |
+
+Telegram 推送为可选功能。请在 GitHub Actions Secrets 或本地运行环境中同时配置 `TELEGRAM_BOT_TOKEN` 和 `TELEGRAM_CHAT_ID`；如需推送到群组话题，再配置 `TELEGRAM_MESSAGE_THREAD_ID`。未完整配置时会自动跳过。
 
 > 📌 **目标主播配置说明**：
 > - 可以在 **Repository secrets** 中添加 `HUYA_ROOM_URL`（私密配置）；

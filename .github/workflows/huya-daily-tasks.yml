@@ -3,7 +3,7 @@ name: Huya daily tasks
 
 on:
   schedule:
-    - cron: 11 18 * * *
+    - cron: "6 0 * * *"
       timezone: Asia/Shanghai
   workflow_dispatch:
     inputs:
